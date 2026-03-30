@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import YahooFinance from "yahoo-finance2";
 
-export const dynamic = "force-dynamic"; // always fetch fresh data
-
-const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
+export const dynamic = "force-dynamic";
 
 const TICKERS = [
   { symbol: "YPF", name: "YPF S.A." },
@@ -26,6 +23,10 @@ interface CompanyData {
 }
 
 async function fetchFromYahoo(): Promise<CompanyData[]> {
+  // Dynamic import + lazy init to avoid module-level issues in serverless
+  const YahooFinance = (await import("yahoo-finance2")).default;
+  const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
+
   const companies: CompanyData[] = [];
 
   for (const { symbol, name } of TICKERS) {
@@ -58,7 +59,8 @@ async function fetchFromYahoo(): Promise<CompanyData[]> {
         ytdReturn: null,
       });
       /* eslint-enable @typescript-eslint/no-explicit-any */
-    } catch {
+    } catch (err) {
+      console.error(`[equity] ${symbol} failed:`, err);
       companies.push({
         ticker: symbol,
         name,
@@ -86,6 +88,8 @@ const PLACEHOLDER: CompanyData[] = [
 ];
 
 export async function GET() {
+  let error: string | undefined;
+
   try {
     const companies = await fetchFromYahoo();
     const hasData = companies.some((c) => c.price !== null);
@@ -97,13 +101,15 @@ export async function GET() {
         source: "Yahoo Finance",
       });
     }
-  } catch {
-    // Fall through to placeholder
+    error = "All tickers returned null prices";
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
   }
 
   return NextResponse.json({
     companies: PLACEHOLDER,
     lastUpdated: new Date().toISOString().split("T")[0],
     source: "placeholder",
+    _debug: error,
   });
 }
