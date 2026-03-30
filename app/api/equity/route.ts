@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
+import YahooFinance from "yahoo-finance2";
 
-// This route returns equity snapshot data.
-// Replace with Financial Modeling Prep API calls when you add your API key.
-// Set FMP_API_KEY in your .env.local file.
+export const revalidate = 300; // cache for 5 minutes
 
-const TICKERS = ["YPF", "VIST", "PAM", "GGAL", "GLOB", "TX"];
+const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
+
+const TICKERS = [
+  { symbol: "YPF", name: "YPF S.A." },
+  { symbol: "VIST", name: "Vista Energy" },
+  { symbol: "PAM", name: "Pampa Energia" },
+  { symbol: "GGAL", name: "Grupo Fin. Galicia" },
+  { symbol: "GLOB", name: "Globant" },
+  { symbol: "TX", name: "Ternium" },
+];
 
 interface CompanyData {
   ticker: string;
@@ -17,68 +25,57 @@ interface CompanyData {
   ytdReturn: number | null;
 }
 
-async function fetchFromFMP(): Promise<CompanyData[] | null> {
-  const apiKey = process.env.FMP_API_KEY;
-  if (!apiKey) return null;
+async function fetchFromYahoo(): Promise<CompanyData[]> {
+  const companies: CompanyData[] = [];
 
-  try {
-    const companies: CompanyData[] = [];
+  for (const { symbol, name } of TICKERS) {
+    try {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const quote: any = await yf.quote(symbol);
 
-    for (const ticker of TICKERS) {
+      let summary: any = null;
       try {
-        const [quoteRes, ratiosRes] = await Promise.all([
-          fetch(
-            `https://financialmodelingprep.com/api/v3/quote/${ticker}?apikey=${apiKey}`
-          ),
-          fetch(
-            `https://financialmodelingprep.com/api/v3/ratios-ttm/${ticker}?apikey=${apiKey}`
-          ),
-        ]);
-
-        const quoteData = await quoteRes.json();
-        const ratiosData = await ratiosRes.json();
-
-        const quote = quoteData?.[0];
-        const ratios = ratiosData?.[0];
-
-        if (quote) {
-          companies.push({
-            ticker,
-            name: quote.name || ticker,
-            price: quote.price ?? null,
-            marketCap: quote.marketCap
-              ? Math.round(quote.marketCap / 1_000_000)
-              : null,
-            evEbitda: ratios?.enterpriseValueOverEBITDATTM ?? null,
-            pe: ratios?.peRatioTTM ?? quote.pe ?? null,
-            pbv: ratios?.priceToBookRatioTTM ?? null,
-            ytdReturn: quote.ytd
-              ? parseFloat((quote.ytd * 100).toFixed(1))
-              : null,
-          });
-        }
-      } catch {
-        // Skip ticker on error, continue with others
-        companies.push({
-          ticker,
-          name: ticker,
-          price: null,
-          marketCap: null,
-          evEbitda: null,
-          pe: null,
-          pbv: null,
-          ytdReturn: null,
+        summary = await yf.quoteSummary(symbol, {
+          modules: ["defaultKeyStatistics", "financialData"],
         });
+      } catch {
+        // Some tickers may not have full summary data
       }
-    }
 
-    return companies.length > 0 ? companies : null;
-  } catch {
-    return null;
+      const keyStats = summary?.defaultKeyStatistics;
+      const financialData = summary?.financialData;
+
+      companies.push({
+        ticker: symbol,
+        name: quote?.shortName || quote?.longName || name,
+        price: quote?.regularMarketPrice ?? null,
+        marketCap: quote?.marketCap
+          ? Math.round(quote.marketCap / 1_000_000)
+          : null,
+        evEbitda: keyStats?.enterpriseToEbitda ?? null,
+        pe: quote?.trailingPE ?? null,
+        pbv: keyStats?.priceToBook ?? financialData?.priceToBook ?? null,
+        ytdReturn: null,
+      });
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+    } catch {
+      companies.push({
+        ticker: symbol,
+        name,
+        price: null,
+        marketCap: null,
+        evEbitda: null,
+        pe: null,
+        pbv: null,
+        ytdReturn: null,
+      });
+    }
   }
+
+  return companies;
 }
 
-// Placeholder data used when FMP_API_KEY is not set
+// Placeholder data used as fallback
 const PLACEHOLDER: CompanyData[] = [
   { ticker: "YPF", name: "YPF S.A.", price: 22.45, marketCap: 8830, evEbitda: 3.2, pe: 5.8, pbv: 1.1, ytdReturn: 18.4 },
   { ticker: "VIST", name: "Vista Energy", price: 48.70, marketCap: 4620, evEbitda: 5.1, pe: 9.2, pbv: 2.8, ytdReturn: 24.1 },
@@ -89,11 +86,24 @@ const PLACEHOLDER: CompanyData[] = [
 ];
 
 export async function GET() {
-  const live = await fetchFromFMP();
+  try {
+    const companies = await fetchFromYahoo();
+    const hasData = companies.some((c) => c.price !== null);
+
+    if (hasData) {
+      return NextResponse.json({
+        companies,
+        lastUpdated: new Date().toISOString().split("T")[0],
+        source: "Yahoo Finance",
+      });
+    }
+  } catch {
+    // Fall through to placeholder
+  }
 
   return NextResponse.json({
-    companies: live ?? PLACEHOLDER,
+    companies: PLACEHOLDER,
     lastUpdated: new Date().toISOString().split("T")[0],
-    source: live ? "Financial Modeling Prep" : "placeholder",
+    source: "placeholder",
   });
 }
