@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
 
-export const revalidate = 300; // cache for 5 minutes
+export const dynamic = "force-dynamic"; // always fetch fresh data
 
 const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 

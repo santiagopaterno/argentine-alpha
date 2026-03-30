@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const revalidate = 300; // cache for 5 minutes
+export const dynamic = "force-dynamic"; // always fetch fresh data
 
 interface DolarApiEntry {
   moneda: string;
