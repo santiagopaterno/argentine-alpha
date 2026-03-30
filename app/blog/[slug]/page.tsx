@@ -42,8 +42,8 @@ export default async function BlogPost({ params }: Props) {
 
       <article>
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-white">{post.title}</h1>
-          <time className="text-sm text-gray-500 mt-2 block">{post.date}</time>
+          <h1 className="text-3xl font-bold text-heading">{post.title}</h1>
+          <time className="text-sm text-subtle mt-2 block">{post.date}</time>
         </header>
 
         <div

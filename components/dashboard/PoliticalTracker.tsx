@@ -46,31 +46,31 @@ const FISCAL_DATE = "January 2026";
 
 export default function PoliticalTracker() {
   return (
-    <section className="bg-navy-800 rounded-xl border border-navy-600 p-6 space-y-6">
-      <h2 className="text-lg font-semibold text-white">
+    <section className="panel space-y-6">
+      <h2 className="text-lg text-heading">
         Political & Policy Tracker
       </h2>
 
       {/* ICG + Fiscal Balance */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-navy-700/50 rounded-lg p-4 border border-navy-600/50">
-          <p className="text-xs text-gray-400 mb-1">
+        <div className="panel-inner">
+          <p className="text-xs text-muted mb-1">
             ICG (Gov. Confidence Index)
           </p>
-          <p className="text-2xl font-bold text-white font-mono">
+          <p className="text-2xl font-bold text-primary font-mono">
             {ICG_VALUE}
-            <span className="text-sm text-gray-400 font-normal ml-1">/ 5</span>
+            <span className="text-sm text-muted font-normal ml-1">/ 5</span>
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-subtle mt-1">
             UTdT &middot; {ICG_DATE}
           </p>
         </div>
-        <div className="bg-navy-700/50 rounded-lg p-4 border border-navy-600/50">
-          <p className="text-xs text-gray-400 mb-1">Primary Fiscal Balance</p>
+        <div className="panel-inner">
+          <p className="text-xs text-muted mb-1">Primary Fiscal Balance</p>
           <p className="text-2xl font-bold text-accent-green font-mono">
             {FISCAL_SURPLUS}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-subtle mt-1">
             Min. Economia &middot; {FISCAL_DATE}
           </p>
         </div>
@@ -78,14 +78,14 @@ export default function PoliticalTracker() {
 
       {/* Political Pulse */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-secondary mb-2 uppercase tracking-wider">
           Political Pulse
         </h3>
         <ul className="space-y-2">
           {POLITICAL_PULSE.map((item, i) => (
             <li
               key={i}
-              className="text-sm text-gray-400 pl-4 border-l-2 border-accent-blue/40"
+              className="text-sm text-muted pl-4 border-l-2 border-accent-blue/40"
             >
               {item}
             </li>
@@ -95,7 +95,7 @@ export default function PoliticalTracker() {
 
       {/* Reform Tracker */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-secondary mb-3 uppercase tracking-wider">
           Policy Reform Tracker
         </h3>
         <div className="space-y-2">
@@ -104,21 +104,21 @@ export default function PoliticalTracker() {
             return (
               <div
                 key={r.pillar}
-                className="flex items-start gap-3 bg-navy-700/30 rounded-lg p-3"
+                className="flex items-start gap-3 reform-card rounded-lg p-3"
               >
                 <span className="text-base mt-0.5 shrink-0">{s.icon}</span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-white">
+                    <span className="text-sm font-medium text-primary">
                       {r.pillar}
                     </span>
                     <span
-                      className={`text-xs font-medium px-1.5 py-0.5 rounded ${s.color} bg-navy-600/50`}
+                      className={`text-xs font-medium px-1.5 py-0.5 rounded ${s.color} status-badge`}
                     >
                       {s.label}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{r.note}</p>
+                  <p className="text-xs text-muted mt-0.5">{r.note}</p>
                 </div>
               </div>
             );
@@ -128,7 +128,7 @@ export default function PoliticalTracker() {
 
       {/* Dates to Watch */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-secondary mb-2 uppercase tracking-wider">
           Dates to Watch
         </h3>
         <div className="space-y-1.5">
@@ -137,13 +137,13 @@ export default function PoliticalTracker() {
               <span className="text-accent-cyan font-mono font-medium w-16 shrink-0">
                 {d.date}
               </span>
-              <span className="text-gray-400">{d.event}</span>
+              <span className="text-muted">{d.event}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-subtle">
         This panel is manually curated. Last editorial update: March 28, 2026.
       </p>
     </section>

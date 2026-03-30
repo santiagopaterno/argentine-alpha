@@ -12,18 +12,19 @@ interface MacroData {
   reserves: number | null;
   cpiMonthly: number | null;
   lastUpdated: string;
+  source?: string;
 }
 
 const PLACEHOLDER: MacroData = {
-  officialRate: 1085.0,
-  blueRate: 1210.0,
-  mepRate: 1175.0,
-  cclRate: 1195.0,
-  fxGap: 11.5,
-  countryRisk: 680,
-  reserves: 28450,
-  cpiMonthly: 2.7,
-  lastUpdated: "2026-03-28",
+  officialRate: null,
+  blueRate: null,
+  mepRate: null,
+  cclRate: null,
+  fxGap: null,
+  countryRisk: null,
+  reserves: null,
+  cpiMonthly: null,
+  lastUpdated: "—",
 };
 
 function IndicatorRow({
@@ -52,12 +53,12 @@ function IndicatorRow({
   })();
 
   return (
-    <div className="flex items-center justify-between py-3 border-b border-navy-600/50 last:border-b-0">
+    <div className="flex items-center justify-between py-3 border-b border-themed-subtle last:border-b-0">
       <div>
-        <p className="text-sm text-gray-400">{label}</p>
-        {subtext && <p className="text-xs text-gray-500 mt-0.5">{subtext}</p>}
+        <p className="text-sm text-muted">{label}</p>
+        {subtext && <p className="text-xs text-subtle mt-0.5">{subtext}</p>}
       </div>
-      <p className="text-lg font-semibold text-white font-mono tabular-nums">
+      <p className="text-lg font-semibold text-primary font-mono tabular-nums">
         {formatted}
       </p>
     </div>
@@ -66,11 +67,10 @@ function IndicatorRow({
 
 export default function MacroIndicators() {
   const [data, setData] = useState<MacroData>(PLACEHOLDER);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchMacro() {
-      setLoading(true);
       try {
         const res = await fetch("/api/macro");
         if (res.ok) {
@@ -87,16 +87,13 @@ export default function MacroIndicators() {
   }, []);
 
   return (
-    <section className="bg-navy-800 rounded-xl border border-navy-600 p-6">
+    <section className="panel">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Macro Indicators</h2>
-        <span className="text-xs text-gray-500">
-          Updated: {data.lastUpdated}
+        <h2 className="text-lg text-heading">Macro Indicators</h2>
+        <span className="text-xs text-subtle">
+          {loading ? "Loading..." : `Updated: ${data.lastUpdated}`}
         </span>
       </div>
-      {loading && (
-        <div className="text-center text-gray-500 text-sm py-2">Loading...</div>
-      )}
       <div>
         <IndicatorRow label="USD/ARS Official" value={data.officialRate} format="currency" subtext="BCRA reference rate" />
         <IndicatorRow label="USD/ARS Blue" value={data.blueRate} format="currency" subtext="Parallel market" />
@@ -107,6 +104,9 @@ export default function MacroIndicators() {
         <IndicatorRow label="BCRA Reserves" value={data.reserves} format="billions" />
         <IndicatorRow label="Monthly CPI" value={data.cpiMonthly} format="percent" subtext="Month-over-month" />
       </div>
+      {data.source && (
+        <p className="text-xs text-subtle mt-3">Source: {data.source}</p>
+      )}
     </section>
   );
 }
