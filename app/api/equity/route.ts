@@ -23,9 +23,18 @@ interface CompanyData {
 }
 
 async function fetchFromYahoo(): Promise<CompanyData[]> {
-  // Dynamic import + lazy init to avoid module-level issues in serverless
   const YahooFinance = (await import("yahoo-finance2")).default;
   const yf = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
+
+  // Get ARS/USD rate for currency conversion
+  let arsUsdRate = 1420; // fallback
+  try {
+    const fxRes = await fetch("https://dolarapi.com/v1/dolares/oficial");
+    const fxData = await fxRes.json();
+    arsUsdRate = fxData.venta || 1420;
+  } catch {
+    // Use fallback rate
+  }
 
   const companies: CompanyData[] = [];
 
@@ -33,29 +42,82 @@ async function fetchFromYahoo(): Promise<CompanyData[]> {
     try {
       /* eslint-disable @typescript-eslint/no-explicit-any */
       const quote: any = await yf.quote(symbol);
+      const marketCap: number = quote.marketCap;
+      const price: number = quote.regularMarketPrice;
 
-      let summary: any = null;
+      // Try fundamentalsTimeSeries for accurate balance sheet data
+      let evEbitda: number | null = null;
+      let pbv: number | null = null;
+
       try {
-        summary = await yf.quoteSummary(symbol, {
-          modules: ["defaultKeyStatistics", "financialData"],
+        const fts: any[] = await yf.fundamentalsTimeSeries(symbol, {
+          period1: "2024-01-01",
+          period2: "2025-12-31",
+          type: "annual",
+          module: "all",
         });
+        const latest = fts[fts.length - 1];
+
+        if (latest) {
+          const equity = latest.commonStockEquity ?? latest.stockholdersEquity;
+          const totalDebt = latest.totalDebt ?? 0;
+          const cash =
+            latest.cashEquivalents ??
+            latest.cashAndCashEquivalents ??
+            0;
+          const ebitda = latest.normalizedEBITDA ?? latest.EBITDA;
+
+          // Detect if values are in ARS: if equity > 50x market cap, convert
+          const needsFx = equity != null && equity > marketCap * 50;
+          const fx = needsFx ? arsUsdRate : 1;
+
+          if (equity) {
+            pbv = parseFloat((marketCap / (equity / fx)).toFixed(2));
+          }
+          if (ebitda) {
+            const ev = marketCap + totalDebt / fx - cash / fx;
+            evEbitda = parseFloat((ev / (ebitda / fx)).toFixed(1));
+          }
+        }
       } catch {
-        // Some tickers may not have full summary data
+        // fundamentalsTimeSeries not available for this ticker
       }
 
-      const keyStats = summary?.defaultKeyStatistics;
-      const financialData = summary?.financialData;
+      // Fallback to defaultKeyStatistics for tickers without fundamentals data
+      if (evEbitda === null || pbv === null) {
+        try {
+          const summary: any = await yf.quoteSummary(symbol, {
+            modules: ["defaultKeyStatistics", "financialData"],
+          });
+          const ks = summary?.defaultKeyStatistics;
+          const fd = summary?.financialData;
+
+          // Only use these if the values are reasonable (same-currency tickers)
+          if (evEbitda === null && ks?.enterpriseToEbitda != null) {
+            const val = ks.enterpriseToEbitda;
+            if (val > 0 && val < 100) evEbitda = parseFloat(val.toFixed(1));
+          }
+          if (pbv === null) {
+            const val = ks?.priceToBook ?? fd?.priceToBook;
+            if (val != null && val > 0 && val < 100) {
+              pbv = parseFloat(val.toFixed(2));
+            }
+          }
+        } catch {
+          // Skip
+        }
+      }
 
       companies.push({
         ticker: symbol,
-        name: quote?.shortName || quote?.longName || name,
-        price: quote?.regularMarketPrice ?? null,
-        marketCap: quote?.marketCap
-          ? Math.round(quote.marketCap / 1_000_000)
+        name: quote.shortName || quote.longName || name,
+        price,
+        marketCap: Math.round(marketCap / 1_000_000),
+        evEbitda,
+        pe: quote.trailingPE
+          ? parseFloat(quote.trailingPE.toFixed(1))
           : null,
-        evEbitda: keyStats?.enterpriseToEbitda ?? null,
-        pe: quote?.trailingPE ?? null,
-        pbv: keyStats?.priceToBook ?? financialData?.priceToBook ?? null,
+        pbv,
         ytdReturn: null,
       });
       /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -88,8 +150,6 @@ const PLACEHOLDER: CompanyData[] = [
 ];
 
 export async function GET() {
-  let error: string | undefined;
-
   try {
     const companies = await fetchFromYahoo();
     const hasData = companies.some((c) => c.price !== null);
@@ -101,15 +161,13 @@ export async function GET() {
         source: "Yahoo Finance",
       });
     }
-    error = "All tickers returned null prices";
-  } catch (err) {
-    error = err instanceof Error ? err.message : String(err);
+  } catch {
+    // Fall through to placeholder
   }
 
   return NextResponse.json({
     companies: PLACEHOLDER,
     lastUpdated: new Date().toISOString().split("T")[0],
     source: "placeholder",
-    _debug: error,
   });
 }
